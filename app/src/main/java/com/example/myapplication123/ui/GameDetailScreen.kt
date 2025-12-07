@@ -39,6 +39,8 @@ fun GameDetailScreen(
                 Button(onClick = { onPlayGame(game.id) }) {
                     Text("Spiel starten")
                 }
+            } else {
+                Text("Spiel nicht gefunden")
             }
         }
     }
