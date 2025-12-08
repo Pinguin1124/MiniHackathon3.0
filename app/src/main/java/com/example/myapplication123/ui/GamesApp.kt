@@ -15,16 +15,70 @@ fun GamesApp() {
         Surface(color = MaterialTheme.colorScheme.background) {
             val navController = rememberNavController()
 
+            // ToDo-Liste State
+            var todos by remember {
+                mutableStateOf(
+                    listOf<TodoItem>()
+                )
+            }
+            var nextTodoId by remember { mutableStateOf(1) }
+            var playedGamesCount by remember { mutableStateOf(0) }
+
+            // Funktion zum Prüfen ob Spiele gesperrt sind (wenn eine Aufgabe überfällig ist)
+            val gamesBlocked = todos.any { it.isOverdue() }
+
+            // Berechne erlaubte Spiele basierend auf erledigten Aufgaben
+            val allowedGames = todos
+                .filter { it.completedAt != null }
+                .sumOf { it.getAllowedGames() }
+
             NavHost(
                 navController = navController,
                 startDestination = "home",
                 modifier = Modifier.fillMaxSize()
             ) {
                 composable("home") {
-                    HomeScreen(
+                    TodoHomeScreen(
+                        todos = todos,
+                        allowedGames = allowedGames,
+                        onAddTodo = { title, desc ->
+                            todos = todos + TodoItem(
+                                id = nextTodoId++,
+                                title = title,
+                                description = desc
+                            )
+                        },
+                        onCompleteTodo = { id ->
+                            todos = todos.map {
+                                if (it.id == id && it.completedAt == null) {
+                                    it.copy(completedAt = System.currentTimeMillis())
+                                } else {
+                                    it
+                                }
+                            }
+                        },
+                        onDeleteTodo = { id ->
+                            todos = todos.filter { it.id != id }
+                        },
+                        onNavigateToGames = {
+                            navController.navigate("games")
+                        }
+                    )
+                }
+
+                composable("games") {
+                    GamesSelectionScreen(
                         games = sampleGames,
+                        allowedGames = allowedGames,
+                        playedGamesCount = playedGamesCount,
                         onGameClick = { gameId ->
-                            navController.navigate("game_detail/$gameId")
+                            if (playedGamesCount < allowedGames) {
+                                playedGamesCount++
+                                navController.navigate("game_detail/$gameId")
+                            }
+                        },
+                        onBackToTodos = {
+                            navController.navigate("home")
                         }
                     )
                 }
@@ -37,25 +91,47 @@ fun GamesApp() {
                         game = game,
                         onBack = { navController.popBackStack() },
                         onPlayGame = { id ->
-                            when (id) {
-                                1 -> navController.navigate("mini_memory")
-                                2 -> navController.navigate("mini_reaction")
-                                3 -> navController.navigate("mini_puzzle")
+                            if (gamesBlocked || playedGamesCount >= allowedGames) {
+                                navController.navigate("home")
+                            } else {
+                                when (id) {
+                                    1 -> navController.navigate("mini_memory")
+                                    2 -> navController.navigate("mini_reaction")
+                                    3 -> navController.navigate("mini_puzzle")
+                                }
                             }
                         }
                     )
                 }
 
                 composable("mini_memory") {
-                    MiniMemory()
+                    if (gamesBlocked || playedGamesCount >= allowedGames) {
+                        LaunchedEffect(Unit) {
+                            navController.navigate("home")
+                        }
+                    } else {
+                        MiniMemory()
+                    }
                 }
 
                 composable("mini_reaction") {
-                    MiniReaction()
+                    if (gamesBlocked || playedGamesCount >= allowedGames) {
+                        LaunchedEffect(Unit) {
+                            navController.navigate("home")
+                        }
+                    } else {
+                        MiniReaction()
+                    }
                 }
 
                 composable("mini_puzzle") {
-                    MiniPuzzle()
+                    if (gamesBlocked || playedGamesCount >= allowedGames) {
+                        LaunchedEffect(Unit) {
+                            navController.navigate("home")
+                        }
+                    } else {
+                        MiniPuzzle()
+                    }
                 }
             }
         }
